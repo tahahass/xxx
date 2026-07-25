@@ -1,1 +1,1 @@
-Temporary pull-request runner probe — private checkout test.
+Temporary pull-request runner probe — package Linux .NET SDK.
