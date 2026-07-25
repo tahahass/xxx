@@ -1,0 +1,14 @@
+name: Public Actions probe
+on:
+  workflow_dispatch:
+  push:
+    branches: [master, main]
+jobs:
+  probe:
+    runs-on: windows-2022
+    steps:
+      - name: Confirm runner
+        shell: pwsh
+        run: |
+          Write-Host "GitHub-hosted Windows runner started successfully."
+          Get-ComputerInfo | Select-Object WindowsProductName, WindowsVersion
