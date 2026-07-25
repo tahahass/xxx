@@ -70,9 +70,9 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake git libboost-filesystem-dev libboost-iostreams-dev libboost-program-options-dev liblzma-dev libbz2-dev libzstd-dev
+          sudo apt-get install -y build-essential cmake git libboost-filesystem-dev libboost-iostreams-dev libboost-program-options-dev libboost-date-time-dev libboost-system-dev liblzma-dev libbz2-dev libzstd-dev zlib1g-dev
           git clone --depth 1 https://github.com/dscharrer/innoextract.git "${RUNNER_TEMP}/innoextract-src"
-          cmake -S "${RUNNER_TEMP}/innoextract-src" -B "${RUNNER_TEMP}/innoextract-build" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="${RUNNER_TEMP}/innoextract-install"
+          cmake -S "${RUNNER_TEMP}/innoextract-src" -B "${RUNNER_TEMP}/innoextract-build" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DUSE_LTO=OFF -DCMAKE_INSTALL_PREFIX="${RUNNER_TEMP}/innoextract-install"
           cmake --build "${RUNNER_TEMP}/innoextract-build" --config Release --parallel 2
           cmake --install "${RUNNER_TEMP}/innoextract-build" --config Release
           "${RUNNER_TEMP}/innoextract-install/bin/innoextract" --version
