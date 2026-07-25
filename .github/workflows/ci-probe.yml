@@ -3,6 +3,8 @@ on:
   workflow_dispatch:
   push:
     branches: [master, main]
+  pull_request:
+    branches: [master, main]
 jobs:
   probe:
     runs-on: windows-2022
