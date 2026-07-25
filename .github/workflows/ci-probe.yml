@@ -14,3 +14,20 @@ jobs:
         run: |
           Write-Host "GitHub-hosted Windows runner started successfully."
           Get-ComputerInfo | Select-Object WindowsProductName, WindowsVersion
+
+  private-checkout:
+    runs-on: windows-2022
+    steps:
+      - name: Try same-owner private repository checkout with workflow token
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: tahahass/just
+          ref: codex/phiq-backup-lock-alert-final-20260725
+          token: ${{ github.token }}
+          persist-credentials: false
+      - name: Confirm private source checkout
+        shell: pwsh
+        run: |
+          $count = @(Get-ChildItem -Recurse -File).Count
+          Write-Host "Private source file count: $count"
+          if ($count -lt 20) { throw 'Private checkout did not contain expected source.' }
