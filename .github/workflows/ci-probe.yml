@@ -15,55 +15,84 @@ jobs:
           Write-Host "GitHub-hosted Windows runner started successfully."
           Get-ComputerInfo | Select-Object WindowsProductName, WindowsVersion
 
-  sdk-pack:
+  sdk-minimal-pack:
     runs-on: ubuntu-24.04
     steps:
       - name: Install exact .NET SDK
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.302
-      - name: Package SDK
+      - name: Package only the exact SDK and runtime
         shell: bash
         run: |
           set -euo pipefail
-          echo "DOTNET_ROOT=${DOTNET_ROOT}"
           dotnet --info
-          tar -C "${DOTNET_ROOT}" -czf "${RUNNER_TEMP}/dotnet-sdk-10.0.302-linux-x64.tar.gz" .
-          sha256sum "${RUNNER_TEMP}/dotnet-sdk-10.0.302-linux-x64.tar.gz" > "${RUNNER_TEMP}/dotnet-sdk-10.0.302-linux-x64.tar.gz.sha256"
-      - name: Upload SDK package
+          src="${DOTNET_ROOT}"
+          dst="${RUNNER_TEMP}/dotnet-minimal"
+          mkdir -p "$dst/host/fxr" "$dst/sdk" "$dst/shared" "$dst/packs" "$dst/sdk-manifests"
+          cp "$src/dotnet" "$dst/dotnet"
+          cp -a "$src/host/fxr/$(ls -1 "$src/host/fxr" | sort -V | tail -1)" "$dst/host/fxr/"
+          cp -a "$src/sdk/10.0.302" "$dst/sdk/"
+          for framework in Microsoft.NETCore.App Microsoft.AspNetCore.App; do
+            version=$(ls -1 "$src/shared/$framework" | sort -V | tail -1)
+            mkdir -p "$dst/shared/$framework"
+            cp -a "$src/shared/$framework/$version" "$dst/shared/$framework/"
+          done
+          for pack in Microsoft.NETCore.App.Ref Microsoft.AspNetCore.App.Ref Microsoft.NETCore.App.Host.linux-x64; do
+            version=$(ls -1 "$src/packs/$pack" | sort -V | tail -1)
+            mkdir -p "$dst/packs/$pack"
+            cp -a "$src/packs/$pack/$version" "$dst/packs/$pack/"
+          done
+          if [ -d "$src/sdk-manifests/10.0.100" ]; then
+            cp -a "$src/sdk-manifests/10.0.100" "$dst/sdk-manifests/"
+          fi
+          for file in LICENSE.txt ThirdPartyNotices.txt; do
+            [ ! -f "$src/$file" ] || cp "$src/$file" "$dst/$file"
+          done
+          tar -C "${RUNNER_TEMP}" -czf "${RUNNER_TEMP}/dotnet-sdk-10.0.302-minimal-linux-x64.tar.gz" dotnet-minimal
+          sha256sum "${RUNNER_TEMP}/dotnet-sdk-10.0.302-minimal-linux-x64.tar.gz" > "${RUNNER_TEMP}/dotnet-sdk-10.0.302-minimal-linux-x64.tar.gz.sha256"
+          du -h "${RUNNER_TEMP}/dotnet-sdk-10.0.302-minimal-linux-x64.tar.gz"
+      - name: Upload minimal SDK package
         uses: actions/upload-artifact@v4
         with:
-          name: dotnet-sdk-10.0.302-linux-x64
+          name: dotnet-sdk-10.0.302-minimal-linux-x64
           path: |
-            ${{ runner.temp }}/dotnet-sdk-10.0.302-linux-x64.tar.gz
-            ${{ runner.temp }}/dotnet-sdk-10.0.302-linux-x64.tar.gz.sha256
+            ${{ runner.temp }}/dotnet-sdk-10.0.302-minimal-linux-x64.tar.gz
+            ${{ runner.temp }}/dotnet-sdk-10.0.302-minimal-linux-x64.tar.gz.sha256
           if-no-files-found: error
           retention-days: 1
 
-  innoextract-pack:
+  innoextract-current-pack:
     runs-on: ubuntu-24.04
     steps:
-      - name: Install and package innoextract
+      - name: Build current innoextract from source
         shell: bash
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y innoextract
+          sudo apt-get install -y build-essential cmake git libboost-filesystem-dev libboost-iostreams-dev libboost-program-options-dev liblzma-dev libbz2-dev libzstd-dev
+          git clone --depth 1 https://github.com/dscharrer/innoextract.git "${RUNNER_TEMP}/innoextract-src"
+          cmake -S "${RUNNER_TEMP}/innoextract-src" -B "${RUNNER_TEMP}/innoextract-build" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="${RUNNER_TEMP}/innoextract-install"
+          cmake --build "${RUNNER_TEMP}/innoextract-build" --config Release --parallel 2
+          cmake --install "${RUNNER_TEMP}/innoextract-build" --config Release
+          "${RUNNER_TEMP}/innoextract-install/bin/innoextract" --version
           root="${RUNNER_TEMP}/innoextract-bundle"
           mkdir -p "$root/bin" "$root/lib"
-          cp /usr/bin/innoextract "$root/bin/"
-          ldd /usr/bin/innoextract | awk '/=> \/|^\// { for (i=1; i<=NF; i++) if ($i ~ /^\//) print $i }' | sort -u | while read -r lib; do
-            cp -L "$lib" "$root/lib/"
+          cp "${RUNNER_TEMP}/innoextract-install/bin/innoextract" "$root/bin/"
+          ldd "$root/bin/innoextract" | awk '/=> \/|^\// { for (i=1; i<=NF; i++) if ($i ~ /^\//) print $i }' | sort -u | while read -r lib; do
+            case "$(basename "$lib")" in
+              libc.so.*|libm.so.*|libgcc_s.so.*|libstdc++.so.*|ld-linux*.so.*) ;;
+              *) cp -L "$lib" "$root/lib/" ;;
+            esac
           done
-          /usr/bin/innoextract --version
-          tar -C "${RUNNER_TEMP}" -czf "${RUNNER_TEMP}/innoextract-linux-x64.tar.gz" innoextract-bundle
-          sha256sum "${RUNNER_TEMP}/innoextract-linux-x64.tar.gz" > "${RUNNER_TEMP}/innoextract-linux-x64.tar.gz.sha256"
-      - name: Upload innoextract package
+          tar -C "${RUNNER_TEMP}" -czf "${RUNNER_TEMP}/innoextract-current-linux-x64.tar.gz" innoextract-bundle
+          sha256sum "${RUNNER_TEMP}/innoextract-current-linux-x64.tar.gz" > "${RUNNER_TEMP}/innoextract-current-linux-x64.tar.gz.sha256"
+      - name: Upload current innoextract package
         uses: actions/upload-artifact@v4
         with:
-          name: innoextract-linux-x64
+          name: innoextract-current-linux-x64
           path: |
-            ${{ runner.temp }}/innoextract-linux-x64.tar.gz
-            ${{ runner.temp }}/innoextract-linux-x64.tar.gz.sha256
+            ${{ runner.temp }}/innoextract-current-linux-x64.tar.gz
+            ${{ runner.temp }}/innoextract-current-linux-x64.tar.gz.sha256
           if-no-files-found: error
           retention-days: 1
