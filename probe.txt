@@ -1,1 +1,1 @@
-Temporary pull-request runner probe — package Linux .NET SDK, retry 2.
+Temporary pull-request runner probe — package SDK and Inno extractor.
