@@ -15,19 +15,27 @@ jobs:
           Write-Host "GitHub-hosted Windows runner started successfully."
           Get-ComputerInfo | Select-Object WindowsProductName, WindowsVersion
 
-  private-checkout:
-    runs-on: windows-2022
+  sdk-pack:
+    runs-on: ubuntu-24.04
     steps:
-      - name: Try same-owner private repository checkout with workflow token
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Install exact .NET SDK
+        uses: actions/setup-dotnet@00d7a644d6690f8a6a6d834c0a7a4b2d4f6f125e
         with:
-          repository: tahahass/just
-          ref: codex/phiq-backup-lock-alert-final-20260725
-          token: ${{ github.token }}
-          persist-credentials: false
-      - name: Confirm private source checkout
-        shell: pwsh
+          dotnet-version: 10.0.302
+      - name: Package SDK
+        shell: bash
         run: |
-          $count = @(Get-ChildItem -Recurse -File).Count
-          Write-Host "Private source file count: $count"
-          if ($count -lt 20) { throw 'Private checkout did not contain expected source.' }
+          set -euo pipefail
+          echo "DOTNET_ROOT=${DOTNET_ROOT}"
+          dotnet --info
+          tar -C "${DOTNET_ROOT}" -czf "${RUNNER_TEMP}/dotnet-sdk-10.0.302-linux-x64.tar.gz" .
+          sha256sum "${RUNNER_TEMP}/dotnet-sdk-10.0.302-linux-x64.tar.gz" > "${RUNNER_TEMP}/dotnet-sdk-10.0.302-linux-x64.tar.gz.sha256"
+      - name: Upload SDK package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: dotnet-sdk-10.0.302-linux-x64
+          path: |
+            ${{ runner.temp }}/dotnet-sdk-10.0.302-linux-x64.tar.gz
+            ${{ runner.temp }}/dotnet-sdk-10.0.302-linux-x64.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 1
