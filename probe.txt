@@ -1,1 +1,1 @@
-Temporary pull-request runner probe — private reusable workflow access test.
+Temporary pull-request runner probe — packaging run after reusable test.
