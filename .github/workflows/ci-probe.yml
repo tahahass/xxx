@@ -39,3 +39,31 @@ jobs:
             ${{ runner.temp }}/dotnet-sdk-10.0.302-linux-x64.tar.gz.sha256
           if-no-files-found: error
           retention-days: 1
+
+  innoextract-pack:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Install and package innoextract
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y innoextract
+          root="${RUNNER_TEMP}/innoextract-bundle"
+          mkdir -p "$root/bin" "$root/lib"
+          cp /usr/bin/innoextract "$root/bin/"
+          ldd /usr/bin/innoextract | awk '/=> \/|^\// { for (i=1; i<=NF; i++) if ($i ~ /^\//) print $i }' | sort -u | while read -r lib; do
+            cp -L "$lib" "$root/lib/"
+          done
+          /usr/bin/innoextract --version
+          tar -C "${RUNNER_TEMP}" -czf "${RUNNER_TEMP}/innoextract-linux-x64.tar.gz" innoextract-bundle
+          sha256sum "${RUNNER_TEMP}/innoextract-linux-x64.tar.gz" > "${RUNNER_TEMP}/innoextract-linux-x64.tar.gz.sha256"
+      - name: Upload innoextract package
+        uses: actions/upload-artifact@v4
+        with:
+          name: innoextract-linux-x64
+          path: |
+            ${{ runner.temp }}/innoextract-linux-x64.tar.gz
+            ${{ runner.temp }}/innoextract-linux-x64.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 1
