@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Install exact .NET SDK
-        uses: actions/setup-dotnet@00d7a644d6690f8a6a6d834c0a7a4b2d4f6f125e
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.302
       - name: Package SDK
@@ -31,7 +31,7 @@ jobs:
           tar -C "${DOTNET_ROOT}" -czf "${RUNNER_TEMP}/dotnet-sdk-10.0.302-linux-x64.tar.gz" .
           sha256sum "${RUNNER_TEMP}/dotnet-sdk-10.0.302-linux-x64.tar.gz" > "${RUNNER_TEMP}/dotnet-sdk-10.0.302-linux-x64.tar.gz.sha256"
       - name: Upload SDK package
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@v4
         with:
           name: dotnet-sdk-10.0.302-linux-x64
           path: |
