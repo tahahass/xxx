@@ -15,11 +15,6 @@ jobs:
           Write-Host "GitHub-hosted Windows runner started successfully."
           Get-ComputerInfo | Select-Object WindowsProductName, WindowsVersion
 
-  private-reusable-probe:
-    uses: tahahass/just/.github/workflows/reusable-private-probe.yml@codex/phiq-backup-lock-alert-final-20260725
-    with:
-      source_ref: codex/phiq-backup-lock-alert-final-20260725
-
   sdk-minimal-pack:
     runs-on: ubuntu-24.04
     steps:
