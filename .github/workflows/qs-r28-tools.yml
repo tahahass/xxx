@@ -3,6 +3,8 @@ name: QS R28 ISO tools
 on:
   push:
     branches: [qs-r27-vendor]
+  pull_request:
+    branches: [master]
 
 permissions:
   contents: read
