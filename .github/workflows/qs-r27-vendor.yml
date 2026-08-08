@@ -7,32 +7,43 @@ on:
     branches: [master]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   fetch-vendor:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Download Ubuntu 18.04 xl2tpd package and record provenance
+      - name: Download Ubuntu 18.04 QSVPN runtime packages
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p vendor
+          mkdir -p "${RUNNER_TEMP}/qsvpn-debs" vendor
+          docker run --rm -v "${RUNNER_TEMP}/qsvpn-debs:/out" ubuntu:18.04 bash -lc '
+            set -euo pipefail
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update
+            apt-get install -y --no-install-recommends ca-certificates
+            apt-get -y --download-only --no-install-recommends \
+              -o Dir::Cache::archives=/out \
+              install ppp iptables strongswan-starter strongswan-charon strongswan-libcharon libstrongswan libstrongswan-standard-plugins
+            rm -f /out/lock /out/partial/* 2>/dev/null || true
+          '
           url='https://archive.ubuntu.com/ubuntu/pool/universe/x/xl2tpd/xl2tpd_1.3.10-1ubuntu1_amd64.deb'
-          curl --fail --location --retry 5 --retry-delay 2 --output /tmp/xl2tpd_1.3.10-1ubuntu1_amd64.deb "$url"
-          test "$(stat -c %s /tmp/xl2tpd_1.3.10-1ubuntu1_amd64.deb)" -eq 70552
-          dpkg-deb --info /tmp/xl2tpd_1.3.10-1ubuntu1_amd64.deb | tee vendor/xl2tpd_1.3.10-1ubuntu1_amd64.info.txt
-          sha256sum /tmp/xl2tpd_1.3.10-1ubuntu1_amd64.deb | tee vendor/xl2tpd_1.3.10-1ubuntu1_amd64.deb.sha256
+          curl --fail --location --retry 5 --retry-delay 2 --output "${RUNNER_TEMP}/qsvpn-debs/xl2tpd_1.3.10-1ubuntu1_amd64.deb" "$url"
+          test "$(stat -c %s "${RUNNER_TEMP}/qsvpn-debs/xl2tpd_1.3.10-1ubuntu1_amd64.deb")" -eq 70552
+          find "${RUNNER_TEMP}/qsvpn-debs" -maxdepth 1 -type f -name '*.deb' -print0 | sort -z | xargs -0 sha256sum > vendor/QSVPN-DEBS-SHA256.txt
+          for f in "${RUNNER_TEMP}"/qsvpn-debs/*.deb; do dpkg-deb -f "$f" Package Version Architecture Depends Pre-Depends; echo '---'; done > vendor/QSVPN-DEBS-METADATA.txt
           printf '%s\n' "$url" > vendor/xl2tpd_1.3.10-1ubuntu1_amd64.source-url.txt
-      - name: Upload vendor package
+          ls -lh "${RUNNER_TEMP}/qsvpn-debs"
+      - name: Upload QSVPN runtime package set
         uses: actions/upload-artifact@v4
         with:
-          name: qs-r27-xl2tpd-bionic-amd64
+          name: qs-r27-qsvpn-bionic-amd64
           path: |
-            /tmp/xl2tpd_1.3.10-1ubuntu1_amd64.deb
-            vendor/xl2tpd_1.3.10-1ubuntu1_amd64.info.txt
-            vendor/xl2tpd_1.3.10-1ubuntu1_amd64.deb.sha256
+            ${{ runner.temp }}/qsvpn-debs/*.deb
+            vendor/QSVPN-DEBS-SHA256.txt
+            vendor/QSVPN-DEBS-METADATA.txt
             vendor/xl2tpd_1.3.10-1ubuntu1_amd64.source-url.txt
           if-no-files-found: error
           retention-days: 1
