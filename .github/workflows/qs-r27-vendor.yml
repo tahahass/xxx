@@ -1,49 +1,47 @@
-name: QS R27 vendor fetch
+name: QS R28 ISO tool fetch
 
 on:
   push:
     branches: [qs-r27-vendor]
-  pull_request:
-    branches: [master]
 
 permissions:
   contents: read
 
 jobs:
-  fetch-vendor:
+  package-xorriso:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - name: Download Ubuntu 18.04 QSVPN runtime packages
+      - name: Install and bundle xorriso with non-glibc dependencies
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "${RUNNER_TEMP}/qsvpn-debs" vendor
-          docker run --rm -v "${RUNNER_TEMP}/qsvpn-debs:/out" ubuntu:18.04 bash -lc '
-            set -euo pipefail
-            export DEBIAN_FRONTEND=noninteractive
-            apt-get update
-            apt-get install -y --no-install-recommends ca-certificates
-            apt-get -y --download-only --no-install-recommends \
-              -o Dir::Cache::archives=/out \
-              install ppp iptables strongswan-starter strongswan-charon strongswan-libcharon libstrongswan libstrongswan-standard-plugins
-            rm -f /out/lock /out/partial/* 2>/dev/null || true
-          '
-          url='https://archive.ubuntu.com/ubuntu/pool/universe/x/xl2tpd/xl2tpd_1.3.10-1ubuntu1_amd64.deb'
-          curl --fail --location --retry 5 --retry-delay 2 --output "${RUNNER_TEMP}/qsvpn-debs/xl2tpd_1.3.10-1ubuntu1_amd64.deb" "$url"
-          test "$(stat -c %s "${RUNNER_TEMP}/qsvpn-debs/xl2tpd_1.3.10-1ubuntu1_amd64.deb")" -eq 70552
-          find "${RUNNER_TEMP}/qsvpn-debs" -maxdepth 1 -type f -name '*.deb' -print0 | sort -z | xargs -0 sha256sum > vendor/QSVPN-DEBS-SHA256.txt
-          for f in "${RUNNER_TEMP}"/qsvpn-debs/*.deb; do dpkg-deb -f "$f" Package Version Architecture Depends Pre-Depends; echo '---'; done > vendor/QSVPN-DEBS-METADATA.txt
-          printf '%s\n' "$url" > vendor/xl2tpd_1.3.10-1ubuntu1_amd64.source-url.txt
-          ls -lh "${RUNNER_TEMP}/qsvpn-debs"
-      - name: Upload QSVPN runtime package set
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xorriso
+          root="${RUNNER_TEMP}/xorriso-portable"
+          mkdir -p "$root/bin" "$root/lib"
+          cp /usr/bin/xorriso "$root/bin/"
+          ldd /usr/bin/xorriso | awk '/=> \/|^\// { for (i=1; i<=NF; i++) if ($i ~ /^\//) print $i }' | sort -u | while read -r lib; do
+            base=$(basename "$lib")
+            case "$base" in
+              libc.so.*|libm.so.*|libpthread.so.*|libdl.so.*|librt.so.*|libgcc_s.so.*|ld-linux*.so.*) ;;
+              *) cp -L "$lib" "$root/lib/" ;;
+            esac
+          done
+          cat > "$root/xorriso" <<'EOF'
+          #!/bin/sh
+          HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+          LD_LIBRARY_PATH="$HERE/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" exec "$HERE/bin/xorriso" "$@"
+          EOF
+          chmod 0755 "$root/xorriso"
+          "$root/xorriso" -version
+          tar -C "${RUNNER_TEMP}" -czf "${RUNNER_TEMP}/xorriso-portable-linux-x64.tar.gz" xorriso-portable
+          sha256sum "${RUNNER_TEMP}/xorriso-portable-linux-x64.tar.gz" > "${RUNNER_TEMP}/xorriso-portable-linux-x64.tar.gz.sha256"
+      - name: Upload portable xorriso
         uses: actions/upload-artifact@v4
         with:
-          name: qs-r27-qsvpn-bionic-amd64
+          name: qs-r28-xorriso-portable-linux-x64
           path: |
-            ${{ runner.temp }}/qsvpn-debs/*.deb
-            vendor/QSVPN-DEBS-SHA256.txt
-            vendor/QSVPN-DEBS-METADATA.txt
-            vendor/xl2tpd_1.3.10-1ubuntu1_amd64.source-url.txt
+            ${{ runner.temp }}/xorriso-portable-linux-x64.tar.gz
+            ${{ runner.temp }}/xorriso-portable-linux-x64.tar.gz.sha256
           if-no-files-found: error
           retention-days: 1
