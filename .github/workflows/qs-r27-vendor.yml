@@ -1,0 +1,47 @@
+name: QS R28 ISO tool fetch
+
+on:
+  push:
+    branches: [qs-r27-vendor]
+
+permissions:
+  contents: read
+
+jobs:
+  package-xorriso:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Install and bundle xorriso with non-glibc dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xorriso
+          root="${RUNNER_TEMP}/xorriso-portable"
+          mkdir -p "$root/bin" "$root/lib"
+          cp /usr/bin/xorriso "$root/bin/"
+          ldd /usr/bin/xorriso | awk '/=> \/|^\// { for (i=1; i<=NF; i++) if ($i ~ /^\//) print $i }' | sort -u | while read -r lib; do
+            base=$(basename "$lib")
+            case "$base" in
+              libc.so.*|libm.so.*|libpthread.so.*|libdl.so.*|librt.so.*|libgcc_s.so.*|ld-linux*.so.*) ;;
+              *) cp -L "$lib" "$root/lib/" ;;
+            esac
+          done
+          cat > "$root/xorriso" <<'EOF'
+          #!/bin/sh
+          HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+          LD_LIBRARY_PATH="$HERE/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" exec "$HERE/bin/xorriso" "$@"
+          EOF
+          chmod 0755 "$root/xorriso"
+          "$root/xorriso" -version
+          tar -C "${RUNNER_TEMP}" -czf "${RUNNER_TEMP}/xorriso-portable-linux-x64.tar.gz" xorriso-portable
+          sha256sum "${RUNNER_TEMP}/xorriso-portable-linux-x64.tar.gz" > "${RUNNER_TEMP}/xorriso-portable-linux-x64.tar.gz.sha256"
+      - name: Upload portable xorriso
+        uses: actions/upload-artifact@v4
+        with:
+          name: qs-r28-xorriso-portable-linux-x64
+          path: |
+            ${{ runner.temp }}/xorriso-portable-linux-x64.tar.gz
+            ${{ runner.temp }}/xorriso-portable-linux-x64.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 1

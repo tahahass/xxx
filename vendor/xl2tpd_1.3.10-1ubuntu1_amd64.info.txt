@@ -1,0 +1,27 @@
+ new Debian package, version 2.0.
+ size 70552 bytes: control archive=2408 bytes.
+      88 bytes,     4 lines      conffiles
+     758 bytes,    19 lines      control
+    1657 bytes,    23 lines      md5sums
+    1367 bytes,    54 lines   *  postinst             #!/bin/sh
+    1275 bytes,    51 lines   *  postrm               #!/bin/sh
+    1051 bytes,    45 lines   *  prerm                #!/bin/sh
+ Package: xl2tpd
+ Version: 1.3.10-1ubuntu1
+ Architecture: amd64
+ Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
+ Original-Maintainer: Samir Hussain <shussain@xelerance.com>
+ Installed-Size: 219
+ Depends: libc6 (>= 2.22), libpcap0.8 (>= 0.9.8), ppp, lsb-base (>= 3.0-6)
+ Provides: l2tpd
+ Section: net
+ Priority: optional
+ Homepage: https://www.xelerance.com/software/xl2tpd/
+ Description: layer 2 tunneling protocol implementation
+  xl2tpd is an open source implementation of the L2TP tunneling
+  protocol (RFC2661).  xl2tpd is forked from l2tpd and is maintained by
+  Xelerance Corporation.
+  .
+  The main purpose of this protocol is to tunnel PPP frames through IP
+  networks.  It implements both LAC and LNS role in the L2TP networking
+  architecture.
