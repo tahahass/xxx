@@ -25,7 +25,7 @@ jobs:
           test "$(stat -c %s /tmp/xl2tpd.deb)" -eq 70552
           dpkg-deb --info /tmp/xl2tpd.deb | tee vendor/xl2tpd_1.3.10-1ubuntu1_amd64.info.txt
           sha256sum /tmp/xl2tpd.deb | tee vendor/xl2tpd_1.3.10-1ubuntu1_amd64.deb.sha256
-          base64 -w0 /tmp/xl2tpd.deb > vendor/xl2tpd_1.3.10-1ubuntu1_amd64.deb.b64
+          base64 /tmp/xl2tpd.deb > vendor/xl2tpd_1.3.10-1ubuntu1_amd64.deb.b64
           printf '%s\n' "$url" > vendor/xl2tpd_1.3.10-1ubuntu1_amd64.source-url.txt
       - name: Commit fetched vendor package
         shell: bash
@@ -34,5 +34,9 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add vendor
-          git commit -m 'Fetch Ubuntu 18.04 xl2tpd package for QS R27'
+          if git diff --cached --quiet; then
+            echo 'Vendor package is already current.'
+            exit 0
+          fi
+          git commit -m 'Wrap QS R27 xl2tpd package for connector retrieval'
           git push origin HEAD:qs-r27-vendor
